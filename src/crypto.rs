@@ -1,0 +1,51 @@
+use aes_gcm::{Aes256Gcm, KeyInit, aead::{Aead, generic_array::GenericArray}};
+use rand::Rng;
+use sha2::{Digest, Sha256};
+
+/// Encrypts the binary using the fingerprint as the key base.
+/// Returns `nonce + ciphertext` as a vector of bytes.
+pub fn encrypt_binary(fingerprint: &str, data: &[u8]) -> Option<Vec<u8>> {
+    // Hash the fingerprint to get a 256-bit key
+    let mut hasher = Sha256::new();
+    hasher.update(fingerprint.as_bytes());
+    let key_bytes = hasher.finalize();
+
+    let key = GenericArray::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+
+    // Generate a random 96-bit nonce
+    let mut nonce_bytes = [0u8; 12];
+    rand::thread_rng().fill(&mut nonce_bytes);
+    let nonce = GenericArray::from_slice(&nonce_bytes);
+
+    // Encrypt the binary data
+    match cipher.encrypt(nonce, data) {
+        Ok(mut ciphertext) => {
+            // Prepend nonce to the encrypted data
+            let mut output = nonce_bytes.to_vec();
+            output.append(&mut ciphertext);
+            Some(output)
+        }
+        Err(_) => None,
+    }
+}
+
+/// Decrypts a binary using fingerprint-based key.
+/// Takes `nonce + ciphertext`, returns decrypted data or None.
+pub fn decrypt_binary(fingerprint: &str, encrypted: &[u8]) -> Option<Vec<u8>> {
+    if encrypted.len() < 12 {
+        return None;
+    }
+
+    let nonce = GenericArray::from_slice(&encrypted[0..12]);
+    let ciphertext = &encrypted[12..];
+
+    let mut hasher = Sha256::new();
+    hasher.update(fingerprint.as_bytes());
+    let key_bytes = hasher.finalize();
+
+    let key = GenericArray::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+
+    cipher.decrypt(nonce, ciphertext).ok()
+}
