@@ -6,7 +6,7 @@ mod embed;
 use clap::Parser;
 
 /// Secure Binary Builder
-#[derive(Parser)]
+#[derive(clap::Parser)]
 struct Args {
     /// Path to the binary to secure
     input: String,

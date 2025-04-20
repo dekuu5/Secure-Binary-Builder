@@ -49,3 +49,36 @@ pub fn decrypt_binary(fingerprint: &str, encrypted: &[u8]) -> Option<Vec<u8>> {
 
     cipher.decrypt(nonce, ciphertext).ok()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fingerprint;
+    use std::fs;
+
+    #[test]
+    fn test_real_binary_encryption_and_decryption() {
+        // Use the actual machine fingerprint
+        let fp = fingerprint::generate_fingerprint();
+        println!("[*] Using fingerprint: {}", fp);
+
+        // Load real binary called "heloE" from the root directory
+        let path = "./hello";
+        let original = fs::read(path)
+            .expect("Failed to read ./heloE binary for test");
+
+        // Encrypt the binar9.14.2
+        let encrypted = encrypt_binary(&fp, &original)
+            .expect("Encryption failed on real binary");
+
+        // Decrypt it
+        let decrypted = decrypt_binary(&fp, &encrypted)
+            .expect("Decryption failed");
+
+        // Ensure the decrypted data matches the original binary exactly
+        assert_eq!(original, decrypted, "Decrypted binary does not match original");
+
+        println!("✅ Real binary encrypted and decrypted successfully.");
+    }
+}
