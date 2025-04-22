@@ -1,7 +1,4 @@
-mod builder;
-
-mod embed;
-
+mod decryptor;
 use clap::Parser;
 
 /// Secure Binary Builder
@@ -17,7 +14,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    match builder::secure_binary(&args.input, &args.output) {
+    match decryptor::decrypt_binary(&args.input, &args.output) {
         Ok(_) => println!("✅ Secured binary written to {}", args.output),
         Err(e) => eprintln!("❌ Error: {}", e),
     }

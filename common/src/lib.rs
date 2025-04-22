@@ -2,4 +2,3 @@
 pub mod crypto;
 pub mod fingerprint;
 pub mod embed;
-pub mod builder;

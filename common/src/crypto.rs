@@ -56,6 +56,7 @@ mod tests {
     use super::*;
     use crate::fingerprint;
     use std::fs;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn test_real_binary_encryption_and_decryption() {
@@ -64,7 +65,7 @@ mod tests {
         println!("[*] Using fingerprint: {}", fp);
 
         // Load real binary called "heloE" from the root directory
-        let path = "./hello";
+        let path = "./test1";
         let original = fs::read(path)
             .expect("Failed to read ./heloE binary for test");
 
@@ -75,7 +76,18 @@ mod tests {
         // Decrypt it
         let decrypted = decrypt_binary(&fp, &encrypted)
             .expect("Decryption failed");
+        // Write the decrypted binary to disk
+        let output_path = "./hello_decrypted";
+        fs::write(output_path, &decrypted)
+            .expect("Failed to write decrypted binary to disk");
 
+        // Set executable permissions on the decrypted file
+        let mut permissions = fs::metadata(output_path)
+            .expect("Failed to get metadata for decrypted binary")
+            .permissions();
+        permissions.set_mode(0o755); // rwxr-xr-x
+        fs::set_permissions(output_path, permissions)
+            .expect("Failed to set executable permissions on decrypted binary");
         // Ensure the decrypted data matches the original binary exactly
         assert_eq!(original, decrypted, "Decrypted binary does not match original");
 

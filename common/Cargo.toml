@@ -1,0 +1,13 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sha2 = "0.10"
+aes-gcm = "0.10"
+rand = "0.9.1"
+hex = "0.4"
+sysinfo = "0.34.2"
+winapi = { version = "0.3", features = ["memoryapi", "processthreadsapi", "winnt"] }
+libc = "0.2"
