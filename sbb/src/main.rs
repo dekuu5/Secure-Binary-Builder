@@ -17,6 +17,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    
+
     match builder::secure_binary(&args.input, &args.output) {
         Ok(_) => println!("✅ Secured binary written to {}", args.output),
         Err(e) => eprintln!("❌ Error: {}", e),
