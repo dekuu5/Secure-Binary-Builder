@@ -1,11 +1,24 @@
-// src/embed.rs
 use std::fs;
+use std::path::{PathBuf};
+use std::env;
 
 const MAGIC_HEADER: &[u8] = b"--EMBED_START--";
 const MAGIC_FOOTER: &[u8] = b"--EMBED_END--";
-
 pub fn embed_into_stub(payload: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut stub = std::fs::read("/home/ahmed/Projects/collage/sbb/target/debug/stub")?; // should be a clean copy!
+    let mut path = env::current_dir()?; // base/sbb
+    path.push("target");
+    path.push("debug"); // target/release
+
+    // platform-specific filename
+    path.push(if cfg!(windows) {
+
+        "stub.exe"
+    } else {
+        "stub"
+    });
+    println!("[*] Using stub: {:?}", path);
+
+    let mut stub = fs::read(path)?; // should be a clean copy!
     stub.extend_from_slice(MAGIC_HEADER);
     stub.extend_from_slice(payload);
     stub.extend_from_slice(MAGIC_FOOTER);

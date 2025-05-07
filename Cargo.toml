@@ -5,3 +5,4 @@ members = [
     "stub",
     "unlocker"
 ]
+resolver = "3"

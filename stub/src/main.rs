@@ -81,8 +81,9 @@ fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
 fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     use std::ptr;
     use winapi::um::memoryapi::{VirtualAlloc, VirtualProtect};
-    use winapi::um::processthreadsapi::{CreateThread, WaitForSingleObject};
     use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE};
+    use winapi::um::processthreadsapi::CreateThread;
+    use winapi::um::synchapi::WaitForSingleObject;
 
     // Allocate memory
     let size = binary.len();

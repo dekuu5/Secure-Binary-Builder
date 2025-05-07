@@ -1,8 +1,5 @@
-
 use common::{fingerprint, crypto};
-
-use std::fs;
-
+use std::{fs, path::Path};
 use crate::embed;
 
 pub fn secure_binary(input_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -24,8 +21,16 @@ pub fn secure_binary(input_path: &str, output_path: &str) -> Result<(), Box<dyn 
 
     // 4. Embed the encrypted binary into the stub
     println!("[*] Embedding into stub...");
+    
     let output_bin = embed::embed_into_stub(&encrypted)?;
-    // 5. Save fina21l binary
+
+    // 5. Ensure output directory exists
+    if let Some(parent) = Path::new(output_path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    println!("[*] Writing secured binary to: {}", output_path);
+
+    // 6. Save final binary
     fs::write(output_path, output_bin)?;
     println!("✅ Secured binary written to {}", output_path);
 
