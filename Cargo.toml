@@ -2,6 +2,5 @@
 members = [
     "common",
     "sbb",
-    "stub",
-    "unlocker"
+    "stub"
 ]
