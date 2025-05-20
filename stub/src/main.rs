@@ -74,55 +74,51 @@ fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     Err("Failed to execute binary".into())
-
-    
 }
-
-
-
-/// Execute a binary directly from memory (Windows)
 #[cfg(windows)]
 fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    use std::ptr;
-    use winapi::um::memoryapi::{VirtualAlloc, VirtualProtect};
-    use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE};
-    use winapi::um::processthreadsapi::CreateThread;
-    use winapi::um::synchapi::WaitForSingleObject;
-
-    // Allocate memory
-    let size = binary.len();
-    let mem = unsafe { VirtualAlloc(
-        ptr::null_mut(),
-        size,
-        MEM_COMMIT | MEM_RESERVE,
-        PAGE_READWRITE,
-    ) };
-    if mem.is_null() { return Err("VirtualAlloc failed".into()); }
-
-    // Copy binary into memory
-    unsafe { ptr::copy_nonoverlapping(binary.as_ptr(), mem as *mut u8, size) };
-
-    // Make memory executable
-    let mut old_protect = 0;
-    let prot_ok = unsafe { VirtualProtect(
-        mem,
-        size,
-        PAGE_EXECUTE_READWRITE,
-        &mut old_protect,
-    ) };
-    if prot_ok == 0 { return Err("VirtualProtect failed".into()); }
-
-    // Execute
-    let thread = unsafe { CreateThread(
-        ptr::null_mut(),
-        0,
-        Some(std::mem::transmute(mem)),
-        ptr::null_mut(),
-        0,
-        ptr::null_mut(),
-    ) };
-    if thread.is_null() { return Err("CreateThread failed".into()); }
-
-    unsafe { WaitForSingleObject(thread, winapi::um::winbase::INFINITE) };
+    use std::fs;
+    use std::path::Path;
+    use std::ffi::CString;
+    use winapi::um::processthreadsapi::{CreateProcessA, PROCESS_INFORMATION, STARTUPINFOA};
+    use winapi::shared::minwindef::FALSE;
+    
+    // Write to temporary file (more reliable for Windows)
+    let temp_path = std::env::temp_dir().join("sbb_temp.exe");
+    fs::write(&temp_path, binary)?;
+    
+    // Convert path to CString
+    let path_str = temp_path.to_string_lossy().to_string();
+    let path_cstr = CString::new(path_str)?;
+    
+    // Initialize process structures
+    let mut startup_info: STARTUPINFOA = unsafe { std::mem::zeroed() };
+    startup_info.cb = std::mem::size_of::<STARTUPINFOA>() as u32;
+    
+    let mut process_info: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+    
+    // Create process
+    let success = unsafe {
+        CreateProcessA(
+            path_cstr.as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            FALSE,
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut startup_info,
+            &mut process_info
+        )
+    };
+    
+    // Clean up temp file
+    let _ = fs::remove_file(temp_path);
+    
+    if success == 0 {
+        return Err("CreateProcess failed".into());
+    }
+    
     Ok(())
 }
