@@ -6,3 +6,13 @@ edition = "2024"
 [dependencies]
 common = { path = "../common" }
 libc = "0.2"
+
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = [
+    "processthreadsapi",
+    "memoryapi",
+    "winbase",
+    "winnt",
+    "synchapi"
+] }
