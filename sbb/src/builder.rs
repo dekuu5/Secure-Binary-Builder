@@ -1,7 +1,6 @@
 use common::{fingerprint, crypto};
 use std::fs;
 use std::io::{self, BufRead, Write};
-use std::path::Path;
 use crate::embed;
 use crate::Args;
 

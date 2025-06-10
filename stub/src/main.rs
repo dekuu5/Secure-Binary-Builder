@@ -6,11 +6,8 @@ use common::fingerprint;
 use common::embed;
 
 
-// Use absolute 
-use std::process;
-
 #[cfg(unix)]
-use std::os::fd::{FromRawFd, AsRawFd};
+use std::os::fd::{FromRawFd};
 
 fn main() {
     println!("[*] Stub running...");

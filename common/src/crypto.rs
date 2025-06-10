@@ -15,7 +15,7 @@ pub fn encrypt_binary(fingerprint: &str, data: &[u8]) -> Option<Vec<u8>> {
 
     // Generate a random 96-bit nonce
     let mut nonce_bytes = [0u8; 12];
-    rand::thread_rng().fill(&mut nonce_bytes);
+    rand::rng().fill(&mut nonce_bytes);
     let nonce = GenericArray::from_slice(&nonce_bytes);
 
     // Encrypt the binary data

@@ -39,7 +39,7 @@ fn main() {
     println!("Target: {}", if args.windows { "Windows" } else if args.linux { "Linux" } else { "Unknown" });
 
     match builder::secure_binary(&args) {
-        Ok(output_path) => println!("✅ Secured binary written " ),
+        Ok(_output_path) => println!("✅ Secured binary written " ),
         Err(e) => eprintln!("❌ Error: {}", e),
     }
 

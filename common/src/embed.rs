@@ -1,5 +1,4 @@
-// src/embed.rs
-use std::fs;
+
 
 const MAGIC_HEADER: &[u8] = b"--EMBED_START--";
 const MAGIC_FOOTER: &[u8] = b"--EMBED_END--";
@@ -45,7 +44,7 @@ pub fn embed_into_stub(payload: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Er
 
 pub fn extract_from_stub(exe: &[u8]) -> Option<Vec<u8>> {
     // Search for the last occurrence of the start marker
-    let mut start_positions: Vec<_> = exe.windows(MAGIC_HEADER.len())
+    let start_positions: Vec<_> = exe.windows(MAGIC_HEADER.len())
         .enumerate()
         .filter(|(_, w)| *w == MAGIC_HEADER)
         .map(|(i, _)| i)
