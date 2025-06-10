@@ -1,5 +1,7 @@
 use sha2::{Digest, Sha256};
 use sysinfo::{System, Networks};
+use rand::Rng;
+
 
 pub fn generate_fingerprint() -> String {
     let mut system = System::new_all();
@@ -35,4 +37,16 @@ pub fn generate_fingerprint() -> String {
 
     let hash = Sha256::digest(raw_data.as_bytes());
     hex::encode(hash)
+}
+
+
+pub fn generate_random_key() -> String {
+    println!("[*] Generating random encryption key...");
+    let mut rng = rand::rng();
+    
+    let random_bytes: Vec<u8> = (0..128).map(|_| rng.random()).collect();
+    let hash = Sha256::digest(&random_bytes);
+    let fp = hex::encode(hash);
+    println!("random fp is {}",fp);
+    fp
 }

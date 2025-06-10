@@ -1,8 +1,10 @@
 use common::{fingerprint, crypto};
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use crate::embed;
 use crate::Args;
+
+
 
 pub fn secure_binary(args: &Args) -> Result<String, Box<dyn std::error::Error>> {
     println!("[*] Starting secure build for: {}", args.input);
@@ -10,7 +12,7 @@ pub fn secure_binary(args: &Args) -> Result<String, Box<dyn std::error::Error>> 
     // Generate output path if not specified
     let output_path = format!("{}.secured", args.input);
 
-    // Get fingerprint - either from key file or generate a new one
+    // Get fingerprint - either from key file or generate random bytes
     let fp = if args.encrypt {
         // Read from key file
         let key_path = args.key.as_ref().ok_or("Key file required when --encrypt is used")?;
@@ -23,38 +25,34 @@ pub fn secure_binary(args: &Args) -> Result<String, Box<dyn std::error::Error>> 
         println!("[+] Using fingerprint from key file: {}", fp);
         fp
     } else {
-        // Generate a new fingerprint
-        println!("[*] Generating new machine fingerprint...");
-        let fp = fingerprint::generate_fingerprint();
-        
-        // Save the generated fingerprint to a file
-        let key_path = format!("{}.key", args.input);
-        let mut file = fs::File::create(&key_path)?;
-        file.write_all(fp.as_bytes())?;
-        println!("[+] Generated fingerprint saved to: {}", key_path);
-        
-        fp
+        // Generate random bytes instead of machine fingerprint
+        fingerprint::generate_random_key()
     };
 
     // Read binary
     let bin_data = fs::read(&args.input)?;
     println!("[+] Read {} bytes from input binary", bin_data.len());
 
-    // Encrypt binary with fingerprint
+    // Encrypt binary with fingerprint/key
     println!("[*] Encrypting binary...");
     let encrypted = crypto::encrypt_binary(&fp, &bin_data)
         .ok_or("Encryption failed")?;
     println!("[+] Encrypted size: {} bytes", encrypted.len());
     
-    
     println!("[*] Embedding into stub for target platform...");
     let stub_path = get_stub_path(args);
     println!("[*] Using stub from: {}", stub_path);
     
-    // Embed the encrypted binary into the selected stub
-    let output_bin = embed::embed_into_stub_with_path(&encrypted, &stub_path)?;
+    // Embed multiple payloads (in this case, just one encrypted binary)
+    let payloads = if args.encrypt {
+        vec![encrypted]
+    } else {
+        vec![fp.as_bytes().to_vec(), encrypted]
+    };
     
-    // 5. Save final binary
+    let output_bin = embed::embed_multiple_into_stub(&payloads ,&stub_path)?;
+    
+    // Save final binary
     fs::write(&output_path, output_bin)?;
     println!("✅ Secured binary written to {}", output_path);
 

