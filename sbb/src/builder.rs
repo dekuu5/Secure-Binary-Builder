@@ -70,14 +70,10 @@ pub fn secure_binary(args: &Args) -> Result<String, Box<dyn std::error::Error>> 
 
 // Helper function for choosing the right stub path based on target platform
 pub fn get_stub_path(args: &Args) -> String {
-    let mut stub_path = String::from("/home/ahmed/Projects/collage/sbb/target/release/stub");
-    
-    // Set platform-specific path if needed
-    if args.windows {
-        stub_path = String::from("/home/ahmed/Projects/collage/sbb/target/x86_64-pc-windows-gnu/release/stub.exe");
-    } else if args.linux {
-        // Keep the default Linux stub path
-    }
-    
-    stub_path
+    let stub_path = if args.windows {
+        ".\\stub.exe"
+    } else {
+        "./stub"
+    };
+    stub_path.to_string()
 }
