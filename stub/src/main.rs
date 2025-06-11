@@ -20,7 +20,7 @@ fn main() {
     println!("[+] Read {} bytes", exe_data.len());
 
     // 2. Extract all embedded payloads
-    let payloads = embed::extract_from_stub(&exe_data);
+    let mut payloads = embed::extract_from_stub(&exe_data);
     println!("[+] Extracted {} payload(s)", payloads.len());
 
     if payloads.is_empty() {
@@ -28,34 +28,70 @@ fn main() {
         std::process::exit(1);
     }
 
-    // 3. Determine decryption strategy based on payload count
-    let (fingerprint, encrypted_binary) = match payloads.len() {
-        1 => {
-            // Only encrypted binary embedded - generate fingerprint from machine
-            println!("[*] Single payload detected - using machine fingerprint");
+    // Debug: print payload sizes to help identify them
+    for (i, payload) in payloads.iter().enumerate() {
+        println!("[DEBUG] Payload {}: {} bytes", i, payload.len());
+    }
+
+    // 3. Smart payload identification - get the last payloads (most recent embeddings)
+    let (fingerprint, encrypted_binary) = if payloads.len() >= 2 {
+        // Pop the encrypted binary (should be the largest, last payload)
+        let encrypted_binary = payloads.pop().unwrap();
+        
+        // Pop the potential fingerprint (second to last)
+        let potential_fp = payloads.pop().unwrap();
+        
+        println!("[DEBUG] Encrypted binary size: {} bytes", encrypted_binary.len());
+        println!("[DEBUG] Potential fingerprint size: {} bytes", potential_fp.len());
+        
+        // Check if the potential fingerprint looks like a valid fingerprint
+        // SHA256 hex string should be 64 characters (32 bytes * 2), but we also accept other reasonable sizes
+        if potential_fp.len() >= 32 && potential_fp.len() <= 128 {
+            // Try to decode as UTF-8 string (fingerprint)
+            match String::from_utf8(potential_fp.clone()) {
+                Ok(fp_str) => {
+                    // Check if it's a valid hex string or reasonable fingerprint format
+                    if is_valid_fingerprint(&fp_str) {
+                        println!("[*] Two valid payloads detected - using embedded fingerprint");
+                        println!("[*] Using fingerprint: {}", fp_str);
+                        (fp_str, encrypted_binary)
+                    } else {
+                        println!("[*] Invalid fingerprint format, using machine fingerprint instead");
+                        let fp = fingerprint::generate_fingerprint();
+                        println!("[*] Generated fingerprint: {}", fp);
+                        (fp, encrypted_binary)
+                    }
+                },
+                Err(_) => {
+                    println!("[*] Fingerprint not valid UTF-8, using machine fingerprint instead");
+                    let fp = fingerprint::generate_fingerprint();
+                    println!("[*] Generated fingerprint: {}", fp);
+                    (fp, encrypted_binary)
+                }
+            }
+        } else {
+            println!("[*] Potential fingerprint size invalid ({} bytes), using machine fingerprint", potential_fp.len());
             let fp = fingerprint::generate_fingerprint();
             println!("[*] Generated fingerprint: {}", fp);
-            (fp, &payloads[0])
-        },
-        2 => {
-            // Two payloads: [fingerprint, encrypted_binary]
-            println!("[*] Two payloads detected - using embedded fingerprint");
-            let fp = String::from_utf8(payloads[0].clone())
-                .expect("Failed to decode fingerprint from payload");
-            println!("[*] Using fingerprint: {}", fp);
-            (fp, &payloads[1])
-        },
-        count => {
-            eprintln!("❌ Unexpected number of payloads: {}. Expected 1 or 2.", count);
-            std::process::exit(1);
+            (fp, encrypted_binary)
         }
+    } else if payloads.len() == 1 {
+        // Only one payload - must be encrypted binary, use machine fingerprint
+        println!("[*] Single payload detected - using machine fingerprint");
+        let fp = fingerprint::generate_fingerprint();
+        println!("[*] Generated fingerprint: {}", fp);
+        let encrypted_binary = payloads.pop().unwrap();
+        (fp, encrypted_binary)
+    } else {
+        eprintln!("❌ No valid payloads found.");
+        std::process::exit(1);
     };
 
-    println!("[+] Encrypted binary size: {} bytes", encrypted_binary.len());
+    println!("[+] Final encrypted binary size: {} bytes", encrypted_binary.len());
 
     // 4. Decrypt the binary
     println!("[*] Decrypting binary...");
-    let decrypted = crypto::decrypt_binary(&fingerprint, encrypted_binary)
+    let decrypted = crypto::decrypt_binary(&fingerprint, &encrypted_binary)
         .unwrap_or_else(|| {
             eprintln!("❌ Decryption failed. Wrong fingerprint or corrupted data.");
             std::process::exit(1);
@@ -70,6 +106,23 @@ fn main() {
         std::process::exit(1);
     }
 }
+
+/// Check if a string looks like a valid fingerprint
+fn is_valid_fingerprint(s: &str) -> bool {
+    // Check if it's a valid hex string (for SHA256-based fingerprints)
+    if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+        return true;
+    }
+    
+    // Check if it's a reasonable fingerprint format (alphanumeric with some special chars)
+    if s.len() >= 16 && s.len() <= 128 && 
+       s.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':') {
+        return true;
+    }
+    
+    false
+}
+
 /// Execute a binary directly from memory (Unix)
 #[cfg(unix)]
 fn run_in_memory(binary: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
